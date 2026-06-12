@@ -1,17 +1,14 @@
-# World of Claudecraft — a WoW-Classic-style MMO + RL training environment
+# World of Claudecraft — a WoW-Classic-style MMO
 
-A vanilla-WoW-flavored micro-MMO built for three purposes:
+A vanilla-WoW-flavored micro-MMO you can host and play:
 
 1. **Play it online** — a real client/server game with accounts, persistent
    characters in Postgres, and other players in the world with you.
-2. **Play it offline** in your browser to test things instantly.
-3. **Train neural networks on it** through a fast headless environment with a
-   Python `gymnasium` API — thousands of steps per second on a single machine,
-   instead of the ~4 decisions/second a real WoW client allows.
+2. **Play it offline** in your browser to jump straight into the world.
 
-All three run the **same deterministic simulation core** (`src/sim/`), so an
-agent trained headless behaves identically to what you see in the browser, and
-the multiplayer server is the same rules engine running authoritatively.
+Both run the **same deterministic simulation core** (`src/sim/`), so the
+offline world behaves identically to what the authoritative multiplayer server
+runs for everyone online.
 
 ---
 
@@ -207,56 +204,11 @@ Stormstrike, and Starfire)**
 - Procedural WebAudio sound: melee/spell impacts, level-up fanfare, quest
   chimes, coin clinks, the death sting — no audio files
 
-## Train on it
-
-```bash
-npm run build:env                      # bundles dist-env/env_server.cjs
-pip install gymnasium numpy
-python python/example_random_agent.py  # smoke test + throughput
-```
-
-```python
-from wow_env import WoWClassicEnv
-
-env = WoWClassicEnv(player_class="rogue", frame_skip=5, max_steps=8000)
-obs, info = env.reset(seed=42)
-obs, reward, terminated, truncated, info = env.step(action)
-```
-
-Each env owns a Node subprocess (NDJSON over stdio). For parallel rollouts use
-`gymnasium.vector.AsyncVectorEnv([make_env(...)] * N)`.
-
-### Spaces
-
-- **Observation** — `Box(100,)` float32: self (hp/resource/level/xp/position/
-  facing/GCD/cast/combat/combo points/sitting/dodge-proc), 10 ability slots
-  (ready + cooldown fraction), current target (hp, level diff, distance,
-  relative angle, aggro), 5 nearest mobs, nearest interactable (corpse /
-  ground object / NPC), and per-quest state/progress for all 10 quests.
-- **Action** — `Discrete(23)`: noop, movement (6), jump, target-nearest,
-  attack, ability slots 1–10, interact, stop, eat/drink.
-
-### Reward (configurable via `rewards={...}`)
-
-XP gained (+0.01/xp), kills (+0.2), quest progress (+0.5), quest complete (+5),
-level up (+2), damage dealt (+0.002/hp), damage taken (−0.001/hp), death (−5).
-Episodes truncate at `max_steps`; optionally terminate on death or at level 10.
-
-### Throughput (measured on this machine)
-
-- Sim core: **~10,800 env-steps/sec per core** (`npm run bench`) — ~2,700×
-  faster than real-time play, before adding parallel envs
-- Through Python incl. subprocess IPC: **~4,000 steps/sec** per env, scaling
-  roughly linearly with parallel envs/cores
-
-Determinism: same seed + same action sequence ⇒ bit-identical trajectories
-(covered by tests).
-
 ## Development
 
 ```bash
-npm test                        # 52 vitest tests: formulas, combat, AI, quests, all 9 classes,
-                                #   parties, duels, trades, elites, the crypt, RL iface
+npm test                        # vitest suite: formulas, combat, AI, quests, all 9 classes,
+                                #   parties, duels, trades, elites, the crypt
 npm run build                   # production web build
 node scripts/smoke_browser.mjs  # warrior E2E (needs `npm run dev` running)
 node scripts/smoke_mage.mjs     # mage: casting, polymorph, conjure+drink, death/release
@@ -277,14 +229,11 @@ src/ui/       classic HUD: frames, windows, tooltips, map, FCT
 src/net/      online client: REST auth + WebSocket world mirror (ClientWorld)
 src/world_api.ts  the IWorld interface both Sim and ClientWorld satisfy
 server/       game server: main.ts (HTTP+WS), game.ts (world loop), db.ts, auth.ts
-docker-compose.yml  postgres:16-alpine (eastbrook-db)
-headless/     NDJSON env server for RL
-python/       gymnasium wrapper + example agent
+docker-compose.yml  postgres:16-alpine
 tests/        vitest suite
 scripts/      browser E2E + screenshot tour + multiplayer integration tests
 ```
 
-All art and audio are procedural — no copyrighted assets. Names, quests and
-the zone are original; formulas and mechanics follow vanilla. World seed is
-fixed in `src/main.ts` so the world is the same place every visit; the RL env
-takes a seed per episode.
+Names, quests and the zones are original; formulas and mechanics follow
+vanilla. World seed is fixed in `src/main.ts` so the world is the same place
+every visit.
